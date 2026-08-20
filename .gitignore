@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.miniagent/
+demo_project/
+_stress/
+.git
+.env.local

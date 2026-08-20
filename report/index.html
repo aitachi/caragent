@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>815agent 概览 — 最小完备 Coding Agent</title>
+<style>
+:root{--bg:#f6f8fa;--panel:#ffffff;--line:#d8e0e8;--fg:#1f2a37;--dim:#5a6672;--acc:#0b62a2;--ok:#1b7f4b;--warn:#b25e09;--bad:#c0392b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 "Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:30px;margin:0 0 4px;color:#1a2430}h2{font-size:22px;color:var(--acc);border-left:4px solid var(--acc);padding-left:10px;margin-top:42px}
+h3{font-size:17px;color:#1a2430;margin-top:26px}
+.sub{color:var(--dim);margin-bottom:24px}
+nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 30px}
+nav.tabs a{color:var(--fg);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font-size:14px}
+nav.tabs a:hover{border-color:var(--acc);color:var(--acc)}
+nav.tabs a.here{background:var(--acc);color:#fff;font-weight:700;border-color:var(--acc)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:14px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--thbg,#22303d);color:var(--thfg,#fff)}
+code,pre{background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:6px;font-family:Consolas,monospace;font-size:13px}
+code{padding:1px 6px;color:#9fd3ff}
+pre{padding:14px;overflow-x:auto;color:#c9d6e2;line-height:1.55}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.dim{color:var(--dim)}
+.tag{display:inline-block;background:#22303d;border:1px solid var(--line);border-radius:20px;padding:1px 10px;font-size:12px;color:var(--acc);margin:2px 4px 2px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.flow{font-family:Consolas,monospace;font-size:13px;line-height:1.7;white-space:pre;background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:8px;padding:16px;overflow-x:auto;color:var(--prefg,#1f2a37)}
+html.dark{--bg:#0f1419;--panel:#1a222b;--line:#2b3744;--fg:#d7e0e8;--dim:#8b9aab;--acc:#4fb3ff;--ok:#3fd68f;--warn:#ffb454;--bad:#ff6b6b}
+html.dark h1,html.dark h3{color:#fff}
+html.dark{--codebg:#0a0e12;--codefg:#9fd3ff;--prefg:#c9d6e2;--thbg:#22303d;--thfg:#fff}
+:root{--codebg:#eef2f6;--codefg:#0b62a2;--prefg:#1f2a37;--thbg:#dbe5ef;--thfg:#1f2a37}
+</style>
+</head>
+<body>
+<button id="themeToggle" style="position:fixed;top:14px;right:16px;z-index:99;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer" onclick="var d=document.documentElement.classList.toggle('dark');localStorage.setItem('theme815',d?'dark':'light');this.textContent=d?'🌙 深色':'☀ 亮色'">☀ 亮色</button>
+<script>if(localStorage.getItem('theme815')==='dark'){document.documentElement.classList.add('dark');document.getElementById('themeToggle').textContent='🌙 深色'}</script><div class="wrap">
+<h1>815agent</h1>
+<div class="sub">最小但模块齐全的 Coding Agent · 依据《Agent 模块化设计教程》（kimi-code × Hermes 对照）9 章最小设计落地 · Python 3.10+ / 仅依赖 requests</div>
+<nav class="tabs">
+<a href="Agent模块化设计教程_v2.pdf" style="border-color:#ff6b6b;color:#ff6b6b">教程 PDF(v2)</a>
+<a href="index.html" class="here">概览</a>
+<a href="modules.html">模块设计</a>
+<a href="run.html">如何运行</a>
+<a href="compare.html">对比报告</a>
+<a href="problems.html">问题与解决</a>
+<a href="interview.html">工程问答</a>
+<a href="815agent_report_full.html">合并完整版</a>
+</nav>
+
+<div class="card" style="border-color:#ff6b6b">
+<strong>📕 设计依据原文:</strong><a href="Agent模块化设计教程_v2.pdf" style="color:var(--acc)">《Agent 模块化设计教程 v2》</a>(52 页,kimi-code × Hermes 双 codebase 全模块对照)—— 本项目的每个模块都对应其中一章的最小设计。
+</div>
+<h2>这是什么</h2>
+<div class="card">815agent 是一个<strong>能自动写代码的 Agent Harness</strong>：把一个只会生成 token 的模型（默认 qwen3.7-max，30 万上下文），变成一个能读文件、跑命令、记教训、守边界的工程实体。核心哲学来自教程的两条设计宪法：
+<p><span class="tag">宪法一 · Prompt Cache 神圣</span> 前缀只追加不修改；动态内容（记忆、steer）一律注入消息尾部。</p>
+<p><span class="tag">宪法二 · 窄腰核心</span> 核心 = 一个循环 + 一个消息列表 + 一个工具调用协议；沙盒/记忆/技能/Hooks/ACP 全部挂在边上。</p></div>
+
+<h2>三层架构</h2>
+<div class="flow">表面层   cli.py（终端交互/一次性任务） · acp.py（stdio JSON-RPC 宿主）
+────────────────────────────────────────────────────────────
+Harness  loop.py（窄腰核心 Agent：while ask→act→append）
+          ├─ context.py   每步 preflight 压缩（85% 阈值/头尾保留/免疫包裹）
+          ├─ tools.py     10 工具注册表 + 校验 + 50K 落盘治理
+          ├─ sandbox.py   hardline 硬线 → 去混淆 → 三分级裁决 → workdir 围栏
+          ├─ hooks.py     5 事件回调表 + 进程外 hook（30s 强杀）+ stop 闩锁
+          ├─ memory.py    MEMORY.md 冻结快照 + provenance 追加 + 注入安检
+          ├─ skills.py    SKILL.md 索引常驻一行 + 正文按需注入
+          ├─ subagent.py  delegate_task 隔离派生（独立上下文/预算/transcript）
+          └─ session.py   JSONL transcript 追加重放（崩溃原子/坏行容错）
+────────────────────────────────────────────────────────────
+模型层   llm.py → qwen3.7-max（OpenAI 兼容，结构化重试 429/5xx/超时）</div>
+
+<h2>验证证据（全部现场实测）</h2>
+<table>
+<tr><th>验证</th><th>结果</th></tr>
+<tr><td>离线单元测试（FakeLLM，覆盖全部模块）</td><td class="ok">35 / 35 OK（本机 + Docker 内一致）</td></tr>
+<tr><td>现场写项目 taskcli（待办 CLI）</td><td class="ok">18 tests OK，agent 自愈空 JSON bug 并沉淀教训</td></tr>
+<tr><td>Docker 内现场写项目 expense-cli</td><td class="ok">15 tests OK，干净容器复跑一致</td></tr>
+<tr><td>5 个复杂压力任务（T1–T5）</td><td class="ok">39/19/54/26 tests OK，73 次工具调用 0 错误</td></tr>
+<tr><td>hook 阻断适配探针</td><td class="ok">pip install 被进程外 hook 阻断 → 模型不重试、改标准库完成</td></tr>
+<tr><td>大文件结果治理</td><td class="ok">241KB 日志 → 模型只见 2,130 字符 preview，全量 255,935 字符落盘</td></tr>
+<tr><td>--resume 会话恢复</td><td class="ok">重放后模型准确回忆上轮文件名与统计结果</td></tr>
+<tr><td>上下文压缩实战（小窗口强制）</td><td class="ok">压缩真实触发 2 次，免疫包裹注入，任务完成</td></tr>
+<tr><td>delegate_task 子代理</td><td class="ok">父子 transcript 分离；子代理 11 次探索调用仅回传蒸馏报告</td></tr>
+<tr><td>密钥卫生</td><td class="ok">子进程环境剥离 KEY/TOKEN 类变量；工作区零密钥痕迹</td></tr>
+</table>
+
+<h2>项目位置</h2>
+<div class="card">
+<p>本地：<code>D:\Users\liu.liu\Desktop\815agent\</code>（源码 + DESIGN.md + 本报告 report/）</p>
+<p>dev-server：Docker 镜像 <code>815agent:latest</code>（构建于 /tmp/815agent_build/，现场产物 /tmp/815agent_ws/）</p>
+</div>
+</div></body></html>

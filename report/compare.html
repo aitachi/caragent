@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对比报告 — 815agent vs kimi-code vs Hermes</title>
+<style>
+:root{--bg:#0f1419;--panel:#1a222b;--line:#2b3744;--fg:#d7e0e8;--dim:#8b9aab;--acc:#4fb3ff;--ok:#3fd68f;--warn:#ffb454}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 "Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:26px;margin:0 0 4px;color:#1a2430}h2{font-size:20px;color:var(--acc);border-left:4px solid var(--acc);padding-left:10px;margin-top:38px}
+.sub{color:var(--dim);margin-bottom:24px}
+nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 26px}
+nav.tabs a{color:var(--fg);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font-size:14px}
+nav.tabs a:hover{border-color:var(--acc);color:var(--acc)}
+nav.tabs a.here{background:var(--acc);color:#fff;font-weight:700;border-color:var(--acc)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 22px;margin:14px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--thbg,#22303d);color:var(--thfg,#fff)}
+td.a815{background:rgba(79,179,255,.07)}
+code{background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:Consolas,monospace;font-size:12.5px;color:var(--codefg,#0b62a2)}
+.note{border-left:4px solid var(--warn);background:rgba(255,180,84,.08);padding:10px 16px;border-radius:0 8px 8px 0;margin:14px 0}
+html.dark{--bg:#0f1419;--panel:#1a222b;--line:#2b3744;--fg:#d7e0e8;--dim:#8b9aab;--acc:#4fb3ff;--ok:#3fd68f;--warn:#ffb454;--bad:#ff6b6b}
+html.dark h1,html.dark h3{color:#fff}
+html.dark{--codebg:#0a0e12;--codefg:#9fd3ff;--prefg:#c9d6e2;--thbg:#22303d;--thfg:#fff}
+:root{--codebg:#eef2f6;--codefg:#0b62a2;--prefg:#1f2a37;--thbg:#dbe5ef;--thfg:#1f2a37}
+</style>
+</head>
+<body>
+<button id="themeToggle" style="position:fixed;top:14px;right:16px;z-index:99;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer" onclick="var d=document.documentElement.classList.toggle('dark');localStorage.setItem('theme815',d?'dark':'light');this.textContent=d?'🌙 深色':'☀ 亮色'">☀ 亮色</button>
+<script>if(localStorage.getItem('theme815')==='dark'){document.documentElement.classList.add('dark');document.getElementById('themeToggle').textContent='🌙 深色'}</script><div class="wrap">
+<h1>对比报告</h1>
+<div class="sub">815agent vs kimi-code v0.34 vs Hermes 0.18 —— 同一套演化阶梯，三种爬法（素材：《Agent 模块化设计教程》）</div>
+<nav class="tabs">
+<a href="Agent模块化设计教程_v2.pdf" style="border-color:#ff6b6b;color:#ff6b6b">教程 PDF(v2)</a>
+<a href="index.html">概览</a>
+<a href="modules.html">模块设计</a>
+<a href="run.html">如何运行</a>
+<a href="compare.html" class="here">对比报告</a>
+<a href="problems.html">问题与解决</a>
+<a href="interview.html">工程问答</a>
+<a href="815agent_report_full.html">合并完整版</a>
+</nav>
+
+<div class="note">名称说明：教程对照的两个工业 codebase 是 <strong>kimi-code</strong> 与 <strong>Hermes</strong>（hermes-agent 0.18）。任务描述中的 "deepseek-harness" 在教程素材中不存在，本报告按 Hermes 对照；若指其他 DeepSeek 系 harness，下表维度（主循环形态/压缩策略/安全模型/记忆路线/状态模型）同样可直接套用。</div>
+
+<h2>定位：演化阶梯爬到哪一级</h2>
+<div class="card">教程的方法论：每个模块从 50 行最小设计出发，每一级演化对应一类真实事故。<strong>815agent 刻意停在"最小 + 第 1~2 级"</strong>——它的价值不是功能齐全，而是标定出"一个能自动写代码的 agent 的最小完备集"，并且每个模块都被真实负载验证过（35 单测 + 8 个现场任务）。kimi-code 爬到"做对 + 做安全"，Hermes 爬到"做进系统"。</div>
+
+<h2>全模块对照表</h2>
+<table>
+<tr><th style="width:90px">模块</th><th style="width:27%">815agent</th><th>kimi-code</th><th>Hermes</th></tr>
+<tr><td>主循环</td><td class="a815">while ask→act→append；max_steps 硬墙 + grace 收尾；工具错误回填</td><td>turn/step 队列 + 错误处理器插件链（核心四行语义，重试/续跑全插件化）</td><td>预算驱动 while（90 迭代 + refund 记账 + grace call）+ prologue/epilogue 分层</td></tr>
+<tr><td>上下文</td><td class="a815">chars/4 估算；85% 单阈值；头尾保留 + 免疫包裹摘要；fail-open</td><td>锚点实测+估算双层计量；0.85 触发阻塞式 job；溢出三级收缩自愈</td><td>四阶段压缩 + 三重反抖动（-1 哨兵/无效计数/600s 冷却）+ 压缩锁 + in-place 保会话 id</td></tr>
+<tr><td>工具</td><td class="a815">10 工具字典注册表；参数校验；50K 落盘治理</td><td>三层折叠注册表 + toolPolicy×permissionPolicy 双正交平面 + select_tools 渐进披露</td><td>AST 自动发现 + 核心/bundle + 足迹 6 级阶梯 + tool_search 桥接</td></tr>
+<tr><td>沙盒权限</td><td class="a815">hardline 先于 yolo + NFKC/$IFS 去混淆 + 三分级裁决 + workdir 围栏 + 子进程环境剥离</td><td>12 节静态权限链 + Tool(arg-glob) 规则 + 三档模式；微秒级零 LLM</td><td>8 层纵深：9 步去混淆 + hardline 12 条 + Smart Approval（LLM 三态）+ 6 类执行后端 + 网络出口隔离</td></tr>
+<tr><td>记忆</td><td class="a815">MEMORY.md 冻结快照 + provenance 追加 + 注入安检（多会话防污染加固后）</td><td><strong>无跨会话记忆系统</strong>（有意决策）：会话即记忆（wire journal + resume）+ 声明式 AGENTS.md</td><td>双路注入（冻结快照 + 每轮 prefetch 围栏）+ provider ABC + fork 巩固 + 漂移检测</td></tr>
+<tr><td>技能</td><td class="a815">frontmatter 索引常驻一行 + skill_view 按需正文（两层披露）</td><td>双路激活（用户斜杠/模型工具）+ wire 幂等记账 + 压缩取舍（用户 keep/模型 drop）</td><td>纯文档契约 + 紧闭环 fork（金路径 4 级）+ 松闭环 curator（30/90 天流转，永不硬删）</td></tr>
+<tr><td>Hooks</td><td class="a815">5 事件回调表；before_tool/stop 可阻断；进程外 30s 强杀；stop 一次性闩锁</td><td>20 事件目录 + 进程外子进程 + zod 结构化输出 + Stop 续跑闩锁</td><td>少而深：三类同步 callback + 插件 hook 点（接审批/压缩/学习闭环）</td></tr>
+<tr><td>ACP</td><td class="a815">stdio JSON-RPC 分发表；stdout 纯协议；initialize/session 两方法</td><td>双包双宿主 + 纯函数转换表 + 客户端能力反向注入（acp-fs/acp-terminal）</td><td>4-worker 线程池 + copy_context 并发隔离 + 双层审批 + 60s 超时 deny</td></tr>
+<tr><td>会话/子代理</td><td class="a815">JSONL 追加重放 + delegate_task 隔离派生（独立 messages/transcript/预算，只回 distill）</td><td>wire 事件溯源（单一一致性边界）+ 扁平子代理 + swarm 突发 5 + 700ms 限速</td><td>SQLite 双 FTS5（CJK trigram）+ 软删归档 + session_search + fork 5 重隔离</td></tr>
+</table>
+
+<h2>行为差异（可观测）</h2>
+<table>
+<tr><th>维度</th><th>815agent</th><th>kimi-code</th><th>Hermes</th></tr>
+<tr><td>代码量</td><td class="a815">核心 ~1,300 行（11 文件）</td><td>agent-core-v2 数万行（loopService 单文件 1,222 行）</td><td>更大（conversation_loop 5,294 行 / SessionDB 6,322 行）</td></tr>
+<tr><td>单次交互延迟</td><td class="a815">非流式，整段返回（最小实现代价）</td><td>流式优先，首 token 延迟是一等指标</td><td>事件回调外发，按表面桥接</td></tr>
+<tr><td>失控兜底</td><td class="a815">max_steps 硬墙 + stop 闩锁</td><td>插件链（信任注册齐全）</td><td>预算硬墙 + refund + 显式退出诊断</td></tr>
+<tr><td>无人值守能力</td><td class="a815">有限（ask 模式外无 LLM 兜底裁决）</td><td>低（设计前提：用户在终端前）</td><td>高（Smart Approval/超时 deny/网络出口，为无人值守设计）</td></tr>
+<tr><td>跨会话学习</td><td class="a815">手动 save_lesson + 冻结快照（声明+轻自产）</td><td>零（外包给用户写规则）</td><td>全自动（fork 提取 + curator 生命周期）</td></tr>
+<tr><td>可审计性</td><td class="a815">JSONL transcript 全量可查</td><td>wire.jsonl 事件溯源，全状态可重放</td><td>SQLite + FTS5 全文检索（含压缩归档行）</td></tr>
+</table>
+
+<h2>结论：什么时候选谁</h2>
+<div class="card">
+<p><strong>815agent</strong>：教学/二次开发基座。每个模块一眼看完，每行代码都能回答"防什么事故"；能力缺口（流式、子代理调度、反抖动、MCP）是有意留白，按教程演化阶梯"痛了再加"。</p>
+<p><strong>kimi-code 型</strong>：有人盯着的编程 CLI。延迟与确定性优先，复杂度投在"把功能做对/做安全"，记忆与学习外包给用户。</p>
+<p><strong>Hermes 型</strong>：无人值守多表面平台。安全边界与状态可恢复优先，每个模块都要"做进系统"，代价是数倍代码量。</p>
+</div>
+</div></body></html>

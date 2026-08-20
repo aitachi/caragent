@@ -1,0 +1,7 @@
+.git
+__pycache__/
+*.pyc
+.miniagent/
+demo_project/
+*.md
+!README.md

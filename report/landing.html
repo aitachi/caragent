@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>miniagent · 入口</title>
+<style>
+body{margin:0;background:#0f1419;color:#d7e0e8;font:15px/1.7 "Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:48px 20px 60px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}
+.sub{color:#8b9aab;margin-bottom:28px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.cards{grid-template-columns:1fr}}
+a.card{display:block;background:#1a222b;border:1px solid #2b3744;border-radius:10px;padding:20px 22px;text-decoration:none;color:#d7e0e8}
+a.card:hover{border-color:#4fb3ff}
+a.card .t{font-size:17px;font-weight:700;color:#4fb3ff;margin-bottom:6px}
+a.card .d{color:#8b9aab;font-size:13.5px}
+a.card.hot .t{color:#3fd68f}
+a.card.hot:hover{border-color:#3fd68f}
+.foot{margin-top:26px;color:#8b9aab;font-size:13px}
+code{background:#0a0e12;border:1px solid #2b3744;border-radius:6px;padding:1px 6px;font-family:Consolas,monospace;font-size:12.5px;color:#9fd3ff}
+</style>
+</head>
+<body><div class="wrap">
+<h1>miniagent</h1>
+<div class="sub">最小但模块齐全的 coding agent harness · 11 模块窄腰架构 · 后端 qwen3.7-max · <a href="https://github.com/aitachi/miniagent" style="color:#4fb3ff">GitHub: aitachi/miniagent</a></div>
+<div class="cards">
+<a class="card hot" href="/815agent/query"><div class="t">▶ 在线运行</div><div class="d">输入任务,后台 agent 现场写代码并返回结果、工具轨迹与 token 用量(独立沙盒,并发闸=1)</div></a>
+<a class="card" href="/815agent/full"><div class="t">完整报告</div><div class="d">模块设计 / 如何运行 / 与 kimi-code & Hermes 对比 / 污染分析 / 工程问答(单一页)</div></a>
+<a class="card" href="/815agent/815agent_report_full.pdf"><div class="t">下载 PDF</div><div class="d">合并报告 PDF 版,可离线阅读/归档</div></a>
+<a class="card" href="/815agent/Agent模块化设计教程_v2.pdf"><div class="t">教程原著 PDF</div><div class="d">《Agent 模块化设计教程 v2》52 页 —— 本项目每模块对应其一章最小设计</div></a>
+<a class="card" href="/815agent/index.html"><div class="d" style="color:#4fb3ff;font-weight:700;font-size:17px">分页报告</div><div class="d">概览 / 模块设计 / 如何运行 / 对比报告 / 问题与解决 / 工程问答(分页版)</div></a>
+<a class="card" href="https://github.com/aitachi/miniagent"><div class="t">源码</div><div class="d">github.com/aitachi/miniagent · <code>pip install requests</code> 即可跑 · 41 个离线测试</div></a>
+</div>
+<div class="foot">运行形态:Docker 容器(python:3.12-slim,130MB)· 镜像内零密钥,API key 运行时注入 · 沙盒 hardline 护栏在线生效</div>
+</div></body></html>

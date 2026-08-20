@@ -1,0 +1,430 @@
+\documentclass[10pt,a4paper]{article}
+% 815agent 完整报告(六大板块) — XeLaTeX 中文排版, 小五(9pt), 白底
+% 编译: xelatex 815agent_report_full.tex (跑两遍出目录/页码引用)
+\usepackage{fontspec}
+\usepackage[UTF8,fontset=none]{ctex}
+\setCJKmainfont{Microsoft YaHei}[BoldFont={Microsoft YaHei Bold}]
+\setCJKsansfont{Microsoft YaHei}[BoldFont={Microsoft YaHei Bold}]
+\setCJKmonofont{Microsoft YaHei}[BoldFont={Microsoft YaHei Bold}]
+\setmainfont{Arial}
+\setsansfont{Arial}
+\setmonofont{Consolas}
+
+\usepackage[a4paper,margin=1.5cm,top=1.3cm,bottom=1.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- 配色 ----------
+\definecolor{acc}{HTML}{0B62A2}
+\definecolor{okc}{HTML}{1B7F4B}
+\definecolor{warnc}{HTML}{B25E09}
+\definecolor{badc}{HTML}{C0392B}
+\definecolor{dimc}{HTML}{5A6672}
+\definecolor{linec}{HTML}{B8C2CC}
+\definecolor{headc}{HTML}{E3EBF3}
+\definecolor{boxbg}{HTML}{F5F8FB}
+\definecolor{a815c}{HTML}{EAF3FA}
+\definecolor{notec}{HTML}{FDF3E3}
+
+% ---------- 小五字号 9pt ----------
+\renewcommand{\normalsize}{\fontsize{9}{13.2}\selectfont}
+\renewcommand{\small}{\fontsize{8}{11.5}\selectfont}
+\renewcommand{\footnotesize}{\fontsize{7.5}{10.5}\selectfont}
+\renewcommand{\scriptsize}{\fontsize{6.5}{9}\selectfont}
+\renewcommand{\large}{\fontsize{12}{16}\selectfont}
+\renewcommand{\Large}{\fontsize{15}{20}\selectfont}
+\renewcommand{\LARGE}{\fontsize{18}{24}\selectfont}
+
+% ---------- 标题 ----------
+\titleformat{\section}{\Large\bfseries\sffamily\color{acc}}{\thesection}{0.6em}{}
+[\vspace{-0.5em}{\color{acc}\rule{\textwidth}{1.2pt}}]
+\titlespacing*{\section}{0pt}{14pt}{8pt}
+\titleformat{\subsection}{\large\bfseries\sffamily\color{acc!85!black}}{\thesubsection}{0.5em}{}
+\titlespacing*{\subsection}{0pt}{10pt}{5pt}
+\setcounter{tocdepth}{1}
+
+% ---------- 页眉页脚 ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\sffamily\color{dimc}815agent 完整报告 · 最小完备 Coding Agent}
+\fancyhead[R]{\footnotesize\sffamily\color{dimc}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{linec}\hrule width\headwidth height\headrulewidth}
+
+% ---------- 组件 ----------
+\newcommand{\tagref}[1]{\textcolor{dimc}{\footnotesize\{#1\}}}
+\newcommand{\lv}[2]{\textcolor{#1}{\textbf{\footnotesize[#2]}}}
+% 说明框:淡底色框,先收集到 savebox 再 \fcolorbox 输出
+\makeatletter
+\newsavebox{\mdbox@tmp}
+\newenvironment{infobox}
+{\par\vspace{4pt}\setlength{\fboxsep}{5pt}%
+ \begin{lrbox}{\mdbox@tmp}\begin{minipage}{\dimexpr\linewidth-14pt\relax}\small}
+{\end{minipage}\end{lrbox}%
+ \noindent\fcolorbox{linec}{boxbg}{\usebox{\mdbox@tmp}}\par\vspace{3pt}}
+\newenvironment{notebox}
+{\par\vspace{4pt}\setlength{\fboxsep}{5pt}%
+ \begin{lrbox}{\mdbox@tmp}\begin{minipage}{\dimexpr\linewidth-14pt\relax}\small}
+{\end{minipage}\end{lrbox}%
+ \noindent\fcolorbox{linec}{notec}{\usebox{\mdbox@tmp}}\par\vspace{3pt}}
+\makeatother
+
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\begin{document}
+
+% ================= 封面区 =================
+\begin{center}
+  {\LARGE\bfseries\sffamily 815agent 完整报告}\\[5pt]
+  {\small\color{dimc}最小但模块齐全的 Coding Agent · 概览 / 模块设计 / 如何运行 / 对比报告 / 问题与解决 / 工程问答}\\[3pt]
+  {\footnotesize\color{dimc}依据《Agent 模块化设计教程》(kimi-code $\times$ Hermes 对照)落地 · Python 3.10+ / 仅依赖 requests · 2026-08-15}
+\end{center}
+\vspace{-2pt}
+{\small\tableofcontents}
+\vspace{4pt}
+
+% ================= 1 概览 =================
+\section{概览}
+
+815agent 是一个\textbf{能自动写代码的 Agent Harness}:把一个只会生成 token 的模型(默认 qwen3.7-max,30 万上下文),变成一个能读文件、跑命令、记教训、守边界的工程实体。核心哲学来自教程的两条设计宪法:
+
+\begin{infobox}
+\textbf{宪法一 · Prompt Cache 神圣} --- 前缀只追加不修改;动态内容(记忆、steer)一律注入消息尾部。\\
+\textbf{宪法二 · 窄腰核心} --- 核心 = 一个循环 + 一个消息列表 + 一个工具调用协议;沙盒/记忆/技能/Hooks/ACP 全部挂在边上。
+\end{infobox}
+
+\subsection{三层架构}
+{\footnotesize\ttfamily
+表面层\ \ cli.py(终端交互/一次性任务) · acp.py(stdio JSON-RPC 宿主)\\
+\rule{\linewidth}{0.4pt}\\
+Harness\ \ loop.py(窄腰核心 Agent: while ask→act→append)\\
+\ \ \ \ \ \ \ \ \ ├ context.py\ 每步 preflight 压缩(85\% 阈值/头尾保留/免疫包裹)\\
+\ \ \ \ \ \ \ \ \ ├ tools.py\ \ \ 11 工具注册表 + 校验 + 50K 落盘治理\\
+\ \ \ \ \ \ \ \ \ ├ sandbox.py\ hardline 硬线→去混淆→三分级裁决→workdir 围栏\\
+\ \ \ \ \ \ \ \ \ ├ hooks.py\ \ \ 5 事件回调表 + 进程外 hook(30s 强杀)+ stop 闩锁\\
+\ \ \ \ \ \ \ \ \ ├ memory.py\ \ MEMORY.md 冻结快照 + provenance 追加 + 注入安检\\
+\ \ \ \ \ \ \ \ \ ├ skills.py\ \ SKILL.md 索引常驻一行 + 正文按需注入\\
+\ \ \ \ \ \ \ \ \ ├ subagent.py delegate\_task 隔离派生(独立上下文/预算/transcript)\\
+\ \ \ \ \ \ \ \ \ └ session.py\ JSONL transcript 追加重放(崩溃原子/坏行容错)\\
+\rule{\linewidth}{0.4pt}\\
+模型层\ \ llm.py → qwen3.7-max(OpenAI 兼容,429/5xx 指数退避重试)
+}
+
+\subsection{验证证据(全部现场实测)}
+{\small
+\begin{longtable}{L{0.52\textwidth}L{0.40\textwidth}}
+\hline
+\rowcolor{headc}\textbf{验证} & \textbf{结果} \\\hline\endhead
+离线单元测试(FakeLLM,覆盖全部模块) & \textcolor{okc}{41/41 OK(本机 + Docker 内一致)}\\\hline
+现场写项目 taskcli(待办 CLI) & \textcolor{okc}{18 tests OK,agent 自愈空 JSON bug 并沉淀教训}\\\hline
+Docker 内现场写项目 expense-cli & \textcolor{okc}{15 tests OK,干净容器复跑一致}\\\hline
+5 个复杂压力任务(T1--T5) & \textcolor{okc}{39/19/54/26 tests OK,73 次工具调用 0 错误}\\\hline
+hook 阻断适配探针 & \textcolor{okc}{pip install 被进程外 hook 阻断→模型不重试、改标准库完成}\\\hline
+大文件结果治理 & \textcolor{okc}{241KB 日志→模型只见 2,130 字符 preview,全量落盘}\\\hline
+--resume 会话恢复 & \textcolor{okc}{重放后模型准确回忆上轮文件名与统计结果}\\\hline
+上下文压缩实战(小窗口强制) & \textcolor{okc}{压缩真实触发 2 次,免疫包裹注入,任务完成}\\\hline
+delegate\_task 子代理 & \textcolor{okc}{父子 transcript 分离;子代理 11 次探索仅回传蒸馏报告}\\\hline
+密钥卫生 & \textcolor{okc}{子进程环境剥离 KEY/TOKEN 类变量;工作区零密钥痕迹}\\\hline
+\end{longtable}}
+
+% ================= 2 模块设计 =================
+\section{模块设计}
+
+每个模块 = 一个文件 = 教程一章的``最小设计'' + 必要的第 1$\sim$2 级演化。每份复杂性都对应一个真实痛点。
+
+\subsection{模块分级表}
+分级含义:\lv{dimc}{L0}骨架(教程最小设计,能跑) · \lv{acc}{L1}健壮(失败路径处理) · \lv{okc}{L2}生产化(生产事故反推的机制) · \lv{warnc}{L3}演化(对照 kimi/Hermes 的下一级,按需取不强上)。
+
+{\small
+\begin{longtable}{|c|L{0.09\textwidth}|c|L{0.20\textwidth}|c|L{0.23\textwidth}|L{0.15\textwidth}|}
+\hline
+\rowcolor{headc}\textbf{\#} & \textbf{模块} & \textbf{行} & \textbf{职责一句话} & \textbf{分级} & \textbf{防什么事故} & \textbf{参照物}\\\hline\endhead
+1 & loop.py & 210 & 主循环 ask→act→append,唯一窄腰核心 & \lv{okc}{L2} & 死循环烧钱、崩溃丢进度、不可回放 & kimi 主循环\\\hline
+2 & context.py & 118 & 每步 preflight 压缩(85\% 阈值) & \lv{okc}{L2} & token 溢出即死;粗暴截断打碎缓存 & kimi 阈值+头尾保留\\\hline
+3 & tools.py & 298 & 11 工具注册表+校验+结果治理 & \lv{okc}{L2} & 单条输出灌爆 30 万窗口 & kimi 截断+落盘\\\hline
+4 & sandbox.py & 117 & hardline→去混淆→三分级→围栏 & \lv{warnc}{L3} & rm -rf /、混淆绕过、密钥外泄 & Hermes hardline 先于 yolo\\\hline
+5 & memory.py & 100 & 冻结快照+原子追加+注入安检 & \lv{okc}{L2} & 并发写竞态、毒记忆劫持新会话 & kimi AppendLogStore\\\hline
+6 & skills.py & 86 & 索引一行常驻,正文按需取 & \lv{acc}{L1} & 提示词膨胀撑爆前缀缓存 & kimi 三层披露\\\hline
+7 & hooks.py & 133 & 5 事件回调+进程外 hook+闩锁 & \lv{okc}{L2} & hook 崩溃连坐、stop 永续死锁 & kimi stopHook 闩锁\\\hline
+8 & acp.py & 104 & stdio JSON-RPC 分发 & \lv{acc}{L1} & 一条 print 毁掉协议流 & ACP 协议\\\hline
+9 & session.py & 81 & JSONL 追加重放+TTL 清理 & \lv{okc}{L2} & 崩溃丢会话;transcript 无限涨 & kimi append-only\\\hline
+10 & subagent.py & 35 & delegate\_task 隔离派生 & \lv{acc}{L1} & 探索污染主线;父子压缩分叉 & kimi 扁平子代理\\\hline
+11 & llm.py & 114 & OpenAI 兼容+退避重试+溢出自愈 & \lv{okc}{L2} & 429/5xx、arguments 解析失败 & kimi 溢出自愈 $\leq$3\\\hline
+12 & cli.py & 107 & 交互/一次性/ask 三形态 & \lv{acc}{L1} & GBK 乱码、无恢复入口 & ---\\\hline
+\end{longtable}}
+
+\subsection{整体工作流(知识图谱)}
+\begin{center}
+\begin{tikzpicture}[
+  font=\scriptsize,
+  box/.style={draw=linec, fill=boxbg, rounded corners=2pt, align=center, inner sep=3pt, minimum height=16pt},
+  core/.style={draw=acc, fill=a815c, rounded corners=3pt, align=center, inner sep=4pt, font=\scriptsize\bfseries, text=acc},
+  sec/.style={draw=warnc, fill=notec, rounded corners=2pt, align=center, inner sep=3pt},
+  okb/.style={draw=okc, fill=boxbg, rounded corners=2pt, align=center, inner sep=3pt},
+  ar/.style={-{Stealth[length=4pt]}, draw=dimc, thin},
+  ara/.style={-{Stealth[length=4pt]}, draw=acc, thin},
+  aro/.style={-{Stealth[length=4pt]}, draw=okc, thin},
+  arw/.style={-{Stealth[length=4pt]}, draw=warnc, thin},
+  arb/.style={-{Stealth[length=4pt]}, draw=badc, thin, dashed},
+  lbl/.style={text=dimc, font=\tiny},
+]
+% 主线纵列(居中列,左右两翼收窄防越界)
+\node[box] (user) {用户任务 task};
+\node[box, below=14pt of user] (cli) {cli.py 交互/一次性 · acp.py JSON-RPC 宿主};
+\node[sec, below left=16pt and 6pt of cli] (guard) {入口护栏:\\超 20 万字符直接拒\\(零 LLM 消耗)};
+\node[core, below=16pt of cli] (loop) {loop.py 窄腰核心 · while(预算内)};
+\node[okb, below left=16pt and 62pt of loop] (ctx) {context.py preflight\\估 token$>$85\% $\to$ 头尾保留压缩\\中段 LLM 摘要+免疫包裹};
+\node[box, below=14pt of loop] (llm) {llm.py $\to$ qwen3.7-max\\429/5xx 退避重试 $\leq$5\\溢出 $\to$ 强制压缩自愈 $\leq$3 · usage 账本};
+\node[sec, below=14pt of llm] (sandbox) {sandbox.py 权限裁决\\hardline $\to$ 去混淆 NFKC/\$IFS\\$\to$ fail-closed $\to$ ask/auto/yolo $\to$ 围栏};
+\node[sec, below=10pt of sandbox] (hooks) {hooks.py before\_tool\\进程外 hook 30s 强杀 · veto 即阻断};
+\node[okb, below=14pt of hooks] (tools) {tools.py 执行(11 工具)\\校验 required/类型 · 异常不外抛\\$>$50K 落盘只回 2K preview · bash 120s/30K};
+\node[box, below=14pt of tools, draw=dimc] (sess) {session.py JSONL transcript\\每条消息一行 append(崩溃原子)\\resume 重放 · TTL 30 天 · usage 落盘};
+\node[okb, below=14pt of sess, fill=okc!8] (term) {终止判定\\模型不再调工具 $\to$ 正常收尾\\预算耗尽 $\to$ grace 收尾 · stop 闩锁防永续};
+\node[box, below=14pt of term, draw=okc] (out) {最终回答 + transcript 存档\\session\_end $\to$ 下会话记忆生效};
+% 左列会话边界
+\node[box, left=48pt of ctx, draw=violet!70] (mem) {memory.py MEMORY.md\\session\_start 冻结快照\\provenance 追加 · 注入安检};
+\node[box, below=10pt of mem, draw=violet!70] (skl) {skills.py\\索引常驻一行\\skill\_view 按需取};
+% 右列子代理(收在 sandbox/hooks 右侧,不超页)
+\node[box, below right=30pt and 40pt of sandbox, draw=acc] (sub) {subagent.py delegate\_task\\独立 messages/transcript/预算 30 步\\只回蒸馏报告 $\leq$10K(零污染)};
+% 边
+\draw[ar] (user) -- (cli);
+\draw[arw] (cli.west) -- ++(-6pt,0) |- (guard.east);
+\draw[ar] (cli) -- (loop);
+\draw[ar] (loop.west) -- ++(-8pt,0) |- (ctx.north);
+\draw[ara] (loop) -- (llm);
+\draw[ara] (llm) -- node[lbl, right=2pt] {tool\_calls} (sandbox);
+\draw[arw] (sandbox) -- (hooks);
+\draw[arw] (hooks) -- node[lbl, right=2pt] {放行才执行} (tools);
+\draw[arb] (sandbox.west) -| node[lbl, pos=0.25, above] {拒绝 $\to$ 错误文本回填,模型换路} ($(llm.west)+(0,4pt)$);
+\draw[aro] (tools) -- (sess);
+\draw[aro] (sess) -- (term);
+\draw[aro] (term) -- (out);
+% 结果回填 loop
+\draw[aro] (tools.west) -- ++(-10pt,0) node[lbl, left, align=right, pos=0.2] {结果 append\\(只追加,缓存安全)} |- ($(loop.west)+(0,-6pt)$);
+% 循环回边
+\draw[ara, dashed] (term.west) -- ++(-16pt,0) |- node[lbl, pos=0.25, left] {未终止 $\to$ 下一轮 preflight} (ctx.west);
+% 会话边界虚线
+\draw[dashed, violet!70] (mem) -- (ctx);
+\draw[dashed, dimc] (skl) |- (sess.west);
+% 子代理
+\draw[ara, dashed] (hooks.east) -- ++(10pt,0) |- node[lbl, pos=0.2, right] {派生} (sub.north);
+\draw[ara, dashed] (sub.south) |- node[lbl, pos=0.75, below] {蒸馏报告回主线} ($(term.east)+(0,2pt)$);
+\end{tikzpicture}\\
+{\footnotesize\color{dimc}蓝=主线数据流 · 绿=上下文/结果治理 · 橙=安全裁决链 · 红虚=拒绝路径 · 紫虚=会话边界机制 · 蓝虚=循环回边/子代理派生}
+\end{center}
+
+\textbf{如何读这张图}:主线是中间纵列的一次 turn --- 用户任务进来后,每一步都先过 context.py 的 preflight(窗口没超就原样放行,\textbf{前缀不动即缓存命中}),再把消息列表发给模型;模型要么回文本(不调工具 $\to$ 循环结束),要么回 tool\_calls。每次工具调用必须穿过橙色的裁决链(hardline $\to$ 去混淆 $\to$ 三分级 $\to$ before\_tool hook),任何一环说``不''都走红虚线:错误文本回填给模型,让它自己换路 --- 这是 815agent 最核心的自愈语义。工具结果以 result 消息 append 回列表(绿线),回到循环顶部进入下一轮,直到终止判定。左翼紫虚线是\textbf{会话边界}机制:只在 session\_start(读记忆快照)和会话中追加教训时活动,不参与 turn 内循环 --- 这是``冻结快照''设计的直观体现。右侧蓝虚线是子代理:模型在 turn 内可以调用 delegate\_task 把探索性子任务派生出去,子代理在自己的隔离环境里跑完整 mini-loop,只把蒸馏报告送回主线。
+
+\textbf{一个真实 turn 的走读}(T5 压力任务,30 万窗口被真实逼近):模型先 read\_file 一个 240KB 日志 $\to$ 结果治理触发,全量 255,935 字符落盘,模型只见 2,130 字符 preview + 文件路径 $\to$ 模型按 preview 判断再 grep 定位 $\to$ 若干步后 preflight 估算超 85\%,中段被摘要压缩(免疫包裹注入,system 与首条 user 原样保留) $\to$ 任务继续直到模型给出最终总结。全程 transcript 每步落一行 JSONL,崩溃后 --resume 可从任意一步重放。
+
+\subsection{逐模块详述}
+
+\textbf{1. 主循环 loop.py(210 行)\lv{okc}{L2}} --- 教程 Ch.1 · ask→act→append。四条不变量:消息列表是唯一状态;终止由模型决定(不调工具即结束);工具错误作为文本回填让模型自愈;一切变更只追加(缓存宪法)。演化级 2/5:AGENT815\_MAX\_STEPS(默认 60)预算硬墙兜底,耗尽后给一次 grace 收尾调用;重试下沉到 llm.py。装配点:Agent.\_\_init\_\_ 绑定 sandbox/memory/skills/hooks/transcript,其余模块全部挂在这个类的边上。\\
+{\color{dimc}为什么这样设计:}把``循环''本身压缩到能穷举测试的体量,所有策略(压缩/安全/记忆)都以 preflight 或事件的形式插在循环的固定点上,而不是散落在循环体内 --- 换 provider、换存储、换表面都不需要动 loop.py,这是``窄腰''的具体含义。
+
+\textbf{2. 上下文 context.py(118 行)\lv{okc}{L2}} --- 教程 Ch.2。chars/4 粗估;超 85\% AGENT815\_MAX\_CONTEXT(默认 30 万)触发,未触发原样返回(缓存安全)。head = system + 首条 user;tail 从尾部倒走 $\leq$20\% 预算;\textbf{不切 tool\_call/result 对};最后一条 user 必须在 tail(已修复``单 user 会话被守护规则误杀''边界)。中段 LLM 摘要以 [CONTEXT COMPACTION --- REFERENCE ONLY] 免疫包裹;摘要失败 fail-open 不阻塞主循环。\\
+{\color{dimc}为什么这样设计:}不切协议对是因为 OpenAI 协议里 tool\_call 与其 result 必须成对出现,从中间切断直接 400 报错;免疫包裹是防``摘要里的旧指令被模型当成现行指令执行''--- 摘要明确标注 [REFERENCE ONLY] 且声明最新用户消息优先。85\% 阈值留出的 15\% 余量,正是给单条大工具结果(最坏 2K preview + 若干条消息)的缓冲。
+
+\textbf{3. 工具 tools.py(298 行)\lv{okc}{L2}} --- 教程 Ch.3 · schema+handler 字典注册表。11 个内置工具:read\_file / list\_dir / grep / glob / write\_file / edit\_file / bash / skill\_view / save\_lesson / delegate\_task / memory\_search。execute() 做 required/类型校验,异常不外抛。结果治理(演化级 2):输出超 50K 字符全量落盘 .agent815/tool\_results/,模型只见 2K preview + 路径;bash 输出 30K 截断。
+
+\textbf{4. 沙盒权限 sandbox.py(117 行)\lv{warnc}{L3 最小版}} --- 教程 Ch.4。裁决顺序:\textbf{hardline(rm -rf /、mkfs、dd 裸设备、fork bomb、写 authorized\_keys 等,yolo 也不放行)} $\to$ 未知工具 fail-closed $\to$ 只读放行 $\to$ ask/auto/yolo 按模式。去混淆:NFKC 全角折叠 + \$IFS/\$\{IFS\} 折叠 + 引号拼接剥离后再匹配。写工具路径强制 workdir 围栏;bash 子进程环境剥离 KEY/TOKEN/PASSWORD/SECRET/CREDENTIAL 类变量。\\
+{\color{dimc}为什么 hardline 先于 yolo:}``用户已授权''不能成为无恢复路径破坏的通行证 --- 用户可能被钓鱼、被注入、或只是没意识到命令后果。危险检测是工程层的不可让渡职责,所以它在裁决链第一环,先于任何授权模式。fail-closed(未知工具默认拒)同理:宁可打断任务,不让模型绕过白名单。
+
+\textbf{5. 记忆 memory.py(100 行)\lv{okc}{L2}} --- 教程 Ch.5。会话开始读全文\textbf{烘焙进 system prompt 尾部后冻结}(前缀缓存全程命中);会话中 save\_lesson 追加写,下个会话生效。多会话防污染三件套:追加带 UTC provenance(行级原子);超限截断走 tmp+rename 原子替换;快照加载逐行\textbf{注入安检},命中 promptware 模式的条目替换为占位符。另有 memory\_search 只读检索(平文件+8K 上限,关键词精度足够)。\\
+{\color{dimc}为什么冻结而不是每轮更新:}记忆快照若随会话内容变化,system prompt 前缀就变了,前缀缓存全部失效 --- 每轮都付全价 token。``冻结 + 尾部注入''用一点信息滞后换取整场会话的缓存命中,是缓存宪法的直接应用;教训的更新推到会话边界(save\_lesson $\to$ 下个会话生效),天然避开 turn 内竞态。
+
+\textbf{6. 技能 skills.py(86 行)\lv{acc}{L1}} --- 教程 Ch.6。扫描项目 skills/ 与 workdir .agent815/skills/;frontmatter(name/description)常驻 system prompt 一行索引。正文按需:skill\_view(name) 工具取全文(三层披露的最小两层)。
+
+\textbf{7. Hooks hooks.py(133 行)\lv{okc}{L2}} --- 教程 Ch.7。5 事件:session\_start / session\_end / before\_tool / after\_tool / stop;\textbf{只有 before\_tool 和 stop 可阻断}。进程外 hook:子进程运行、stdin 传 JSON、30s 超时强杀、崩溃不影响主循环。stop 续跑一次性闩锁:防``hook 永远 block $\to$ turn 永不结束''。
+
+\textbf{8. ACP acp.py(104 行)\lv{acc}{L1}} --- 教程 Ch.8。方法:initialize / session/new / session/prompt;未知带 id 方法显式 $-32601$;notification 静默。\textbf{stdout 只走协议帧},日志全重定向 stderr。
+
+\textbf{9. 会话持久化 session.py(81 行)\lv{okc}{L2}} --- 教程 Ch.9。每条消息/事件一行 JSON,append 天然崩溃原子;resume = 重放,坏行容错跳过。cleanup\_old\_sessions(ttl\_days=30) TTL 清理 + CLI --cleanup-days。子代理 transcript 独立文件。
+
+\textbf{10. 子代理 subagent.py(35 行)\lv{acc}{L1}} --- 教程 Ch.9 · 对照 kimi-code 扁平子代理。delegate\_task:派生全新 Agent 实例 --- 独立 messages / 独立 transcript / 独立预算(默认 30 步)/ 独立 stop 闩锁。\textbf{父压缩物理上碰不到子上下文};只回传最终文本(distill,10K 截断);子代理 system prompt 与父一致(暖缓存)。
+
+\textbf{11. LLM 客户端 llm.py(114 行)\lv{okc}{L2}} --- OpenAI 兼容 chat;enable\_thinking:false(qwen3 系必须);429/5xx/超时指数退避 $\times$2 上限 30s + 20\% 抖动 + 尊重 Retry-After,最多 5 次;上下文溢出错误 $\to$ force=True 强制压缩后重试,连续 3 次放弃;arguments JSON 解析失败降级为空对象 + error 标记;每步 usage 累加(prompt/completion/calls)落 transcript。
+
+\textbf{12. CLI cli.py(107 行)\lv{acc}{L1}} --- 交互 / 一次性 / ask 三形态;/exit /memory /compact;--resume 重放;--cleanup-days;启动即 stdout/stderr reconfigure utf-8(Windows GBK 修复)。
+
+% ================= 3 如何运行 =================
+\section{如何运行}
+
+本机 Python / Docker / ACP 宿主三种形态;API key 只走环境变量,绝不进代码与镜像。
+
+\subsection{环境变量}
+{\small
+\begin{longtable}{L{0.30\textwidth}L{0.44\textwidth}L{0.20\textwidth}}
+\hline
+\rowcolor{headc}\textbf{变量} & \textbf{说明} & \textbf{默认}\\\hline\endhead
+AGENT815\_API\_KEY & LLM API key(必填,运行时注入) & ---\\\hline
+AGENT815\_BASE\_URL & OpenAI 兼容接口 & dashscope compatible-mode\\\hline
+AGENT815\_MODEL & 模型名 & qwen3.7-max\\\hline
+AGENT815\_WORKDIR & 沙盒围栏根目录 & 当前目录\\\hline
+AGENT815\_PERMISSION & ask / auto / yolo & auto\\\hline
+AGENT815\_MAX\_CONTEXT & 上下文窗口 tokens(阈值 85\%) & 300000\\\hline
+AGENT815\_MAX\_STEPS & 每 turn 步数预算 & 60\\\hline
+AGENT815\_SUBAGENT\_MAX\_STEPS & 子代理独立步数预算 & 30\\\hline
+AGENT815\_MAX\_INPUT\_CHARS & 入口最大输入字符(超限拒) & 200000\\\hline
+\end{longtable}}
+
+\subsection{三种形态}
+{\footnotesize\ttfamily
+\# 交互模式(/exit 退出,/memory 看记忆,/compact 手动压缩)\\
+python -m agent815 --workdir /path/to/project\\[3pt]
+\# 一次性任务\\
+python -m agent815 --workdir ./proj --permission auto --task "创建 utils.py 并写好 unittest"\\[3pt]
+\# 恢复会话(重放 transcript 继续)\\
+python -m agent815 --workdir ./proj --resume .agent815/sessions/<ts>.jsonl\\[3pt]
+\# Docker\\
+docker run --rm -v /tmp/ws:/workspace -e AGENT815\_API\_KEY=\$KEY 815agent:latest\\
+\ \ --task "写一个记账 CLI 并跑通 unittest"\\[3pt]
+\# ACP 宿主(stdout 只走协议帧,日志全在 stderr)\\
+python -m agent815 --acp\\[3pt]
+\# 测试(41 个离线测试,FakeLLM 不触网)\\
+python tests/test\_all.py
+}
+
+\subsection{扩展点}
+{\small
+\begin{longtable}{L{0.14\textwidth}L{0.30\textwidth}L{0.48\textwidth}}
+\hline
+\rowcolor{headc}\textbf{扩展} & \textbf{位置} & \textbf{说明}\\\hline\endhead
+自定义技能 & skills/<name>/SKILL.md & frontmatter 写 name/description,正文即操作手册\\\hline
+进程外 hook & .agent815/hooks.d/<event>\_*.py & stdin 收 JSON;stdout 打印 \{"decision":"block"\} 即阻断\\\hline
+新工具 & tools.py & @tool 装饰器注册;sandbox.KNOWN\_TOOLS 登记只读属性\\\hline
+\end{longtable}}
+
+% ================= 4 对比报告 =================
+\section{对比报告:815agent vs kimi-code vs Hermes}
+
+教程对照的两个工业 codebase 是 kimi-code(v0.34)与 Hermes(hermes-agent 0.18)。
+
+\begin{notebox}
+\textbf{定位}:教程的方法论是每个模块从 50 行最小设计出发,每一级演化对应一类真实事故。\textbf{815agent 刻意停在``最小 + 第 1$\sim$2 级''}--- 价值不是功能齐全,而是标定``一个能自动写代码的 agent 的最小完备集'',且每个模块都被真实负载验证过。kimi-code 爬到``做对 + 做安全'',Hermes 爬到``做进系统''。
+\end{notebox}
+
+\subsection{全模块对照表}
+{\small
+\begin{longtable}{|L{0.09\textwidth}|L{0.28\textwidth}|L{0.28\textwidth}|L{0.26\textwidth}|}
+\hline
+\rowcolor{headc}\textbf{模块} & \textbf{815agent} & \textbf{kimi-code} & \textbf{Hermes}\\\hline\endhead
+主循环 & \cellcolor{a815c}while ask→act→append;max\_steps 硬墙+grace;错误回填 & turn/step 队列+错误处理器插件链 & 预算驱动 while(90 迭代+refund)+prologue/epilogue\\\hline
+上下文 & \cellcolor{a815c}chars/4 估算;85\% 单阈值;头尾保留+免疫包裹;fail-open & 锚点实测+估算双层;0.85 阻塞式 job;溢出三级收缩 & 四阶段压缩+三重反抖动+压缩锁+in-place 保会话 id\\\hline
+工具 & \cellcolor{a815c}11 工具字典注册表;校验;50K 落盘 & 三层折叠注册表+toolPolicy×permissionPolicy+渐进披露 & AST 自动发现+核心/bundle+足迹 6 级+tool\_search 桥接\\\hline
+沙盒 & \cellcolor{a815c}hardline 先于 yolo+去混淆+三分级+围栏+环境剥离 & 12 节静态权限链+Tool(arg-glob)+三档;微秒级 & 8 层纵深:9 步去混淆+hardline 12 条+Smart Approval+6 类后端+网络隔离\\\hline
+记忆 & \cellcolor{a815c}冻结快照+provenance+注入安检 & \textbf{无跨会话记忆}(有意决策);会话即记忆+AGENTS.md & 双路注入+provider ABC+fork 巩固+漂移检测\\\hline
+技能 & \cellcolor{a815c}frontmatter 索引一行+skill\_view(两层披露) & 双路激活+wire 幂等记账+压缩取舍 & 纯文档契约+紧闭环 fork+松闭环 curator(30/90 天)\\\hline
+Hooks & \cellcolor{a815c}5 事件;before\_tool/stop 可阻断;进程外 30s 强杀;闩锁 & 20 事件+进程外子进程+zod 结构化输出+Stop 闩锁 & 少而深:三类同步 callback+插件 hook 点\\\hline
+ACP & \cellcolor{a815c}stdio JSON-RPC 分发;stdout 纯协议 & 双包双宿主+纯函数转换表+能力反向注入 & 4-worker 线程池+copy\_context 并发隔离+双层审批+60s 超时 deny\\\hline
+会话/子代理 & \cellcolor{a815c}JSONL 追加重放+delegate\_task 隔离派生 & wire 事件溯源+扁平子代理+swarm 突发 5+700ms 限速 & SQLite 双 FTS5(CJK trigram)+软删归档+fork 5 重隔离\\\hline
+\end{longtable}}
+
+\subsection{行为差异与选型结论}
+{\small
+\begin{longtable}{|L{0.14\textwidth}|L{0.26\textwidth}|L{0.26\textwidth}|L{0.24\textwidth}|}
+\hline
+\rowcolor{headc}\textbf{维度} & \textbf{815agent} & \textbf{kimi-code} & \textbf{Hermes}\\\hline\endhead
+代码量 & \cellcolor{a815c}核心 $\sim$1,300 行(12 文件) & 数万行(loopService 1,222 行) & 更大(conversation\_loop 5,294 行)\\\hline
+延迟 & \cellcolor{a815c}非流式整段返回 & 流式优先,首 token 一等指标 & 事件回调外发\\\hline
+失控兜底 & \cellcolor{a815c}max\_steps 硬墙+stop 闩锁 & 插件链 & 预算硬墙+refund+退出诊断\\\hline
+无人值守 & \cellcolor{a815c}有限 & 低(设计前提:用户在终端前) & 高(为无人值守设计)\\\hline
+跨会话学习 & \cellcolor{a815c}save\_lesson+冻结快照 & 零(外包给用户) & 全自动(fork+curator)\\\hline
+可审计 & \cellcolor{a815c}JSONL 全量可查 & wire.jsonl 事件溯源 & SQLite+FTS5 全文检索\\\hline
+\end{longtable}}
+
+\textbf{什么时候选谁}:\textbf{815agent} 教学与二次开发基座,每个模块一眼看完;能力缺口(流式、swarm 调度、反抖动、MCP)是有意留白。\textbf{kimi-code 型} 有人盯着的编程 CLI,延迟与确定性优先。\textbf{Hermes 型} 无人值守多表面平台,安全边界与状态可恢复优先,代价是数倍代码量。
+
+% ================= 5 问题与解决 =================
+\section{问题与解决}
+
+\subsection{问题一:多子代理上下文压缩污染 --- 不存在,且从设计上免疫}
+教程原型事故是 Hermes \#38727:父 agent 与后台 fork 共享同一 session,两边同时触发压缩 $\to$ 历史分叉。815agent 加固前没有子代理机制,该污染无从发生但也是能力缺口;本轮参照 kimi-code 扁平子代理补齐:delegate\_task 派生\textbf{全新 Agent 实例}(独立 messages / 独立 transcript / 独立 30 步预算 / 独立 stop 闩锁),父压缩物理上碰不到子上下文;只回传 distill 报告(10K 截断);system prompt 同前缀暖缓存。现场验证 T7:父 transcript 只有 delegate\_task$\to$write\_file$\to$bash$\times$2,子代理 11 次探索调用记录在自己独立 transcript 里,主线零污染。
+
+\subsection{问题二:多会话记忆压缩污染 --- 一种天然免疫,两种已修复}
+\textbf{形态 A(摘要劫持):天然免疫} --- 记忆快照在 messages[0](system),head 保护永不进中段;摘要带 [REFERENCE ONLY] 免疫包裹。\\
+\textbf{形态 B(并发写截断竞态):已修} --- 追加写带 UTC provenance(行级原子);截断改 tmp+rename 原子替换(kimi AppendLogStore cutover 最小化)。\\
+\textbf{形态 C(毒条目带毒注入):已修} --- 快照加载逐行注入安检(指令覆盖/角色冒充/系统标签等模式),命中条目替换占位符;单测确认毒条目被过滤、正常条目不受影响。\\
+为什么不学 kimi 不要记忆:kimi 把跨会话学习整体外包 --- 零污染面但也零自学习。815agent 保留轻量自产记忆(现场两次主动 save\_lesson 都写出有价值教训),代价是支付 B/C 两项防御。
+
+\subsection{实测问题与修复清单(时间序)}
+{\small
+\begin{longtable}{|c|L{0.20\textwidth}|L{0.24\textwidth}|L{0.26\textwidth}|L{0.14\textwidth}|}
+\hline
+\rowcolor{headc}\textbf{\#} & \textbf{问题} & \textbf{根因} & \textbf{修复} & \textbf{验证}\\\hline\endhead
+1 & 一次性任务结束打印崩溃 & Windows GBK,输出含 emoji & cli.py 启动 reconfigure utf-8 & 冒烟 exit 0\\\hline
+2 & 进程外 hook 读 payload 失败 & 子进程 stdin 默认 GBK & buffer+utf-8;注入 PYTHONIOENCODING & T4b 实测\\\hline
+3 & \textbf{单 user 会话永不压缩} & 守护把 cut 拉回 1$\to$middle 恒空 & 守护仅 last\_user\_idx$\geq$2 生效+回归测试 & t6d 触发 2 次\\\hline
+4 & 记忆并发写竞态/带毒注入 & 见形态 B/C & provenance+tmp+rename+安检 & TestMemory ×3\\\hline
+5 & 无子代理机制(能力缺口) & 最小设计留白 & delegate\_task 物理隔离派生 & TestSubagent+T7\\\hline
+\end{longtable}}
+
+\subsection{已知边界(有意不修,对应教程演化阶梯)}
+极小窗口压缩 thrash(第 6 级反抖动三件套,真实长会话逼近 30 万窗口时加) · LLM 非流式(第 1 级流式解析,交互体验成瓶颈时加) · 无并发子代理调度 swarm(第 5 级,并行探索需求出现时加) · 无 MCP 外部工具桥接(第 8 级) · 无 LLM 兜底裁决 Smart Approval(第 10 级,无人值守部署时加)。
+
+% ================= 6 工程问答 =================
+\section{工程问答(面试题提取 × 实战回答,16 题)}
+
+题目来自 DeepSeek Agent 岗三面连环追问。标注:\textcolor{okc}{\textbf{〔已有机制〕}}现场验证过 · \textcolor{acc}{\textbf{〔针对性补全〕}}本轮新增 · \textcolor{dimc}{\{kimi/Hermes 参照\}}。
+
+\subsection{一面 · 工程细节题}
+\textbf{Q1 上下文用 message window 还是 token window?} \textcolor{okc}{\textbf{〔已有机制〕}}\textbf{token window}。context.py 以估算 token 数(chars/4)对 30 万窗口设 85\% 触发线;message window 无法表达``10 条消息里有一条 240KB 工具输出''的真实分布(T5 实测单条 read\_file 结果 25 万字符)。代价是估算漂移,工业解法是 kimi 双层计量;815agent 停在单层粗估+85\% 保守阈值+溢出自愈兜底(Q4)。\tagref{kimi: 双层计量 · Hermes: 三套信号协调}
+
+\textbf{Q2 会话持久化过期策略?并发会话冲突?} \textcolor{acc}{\textbf{〔针对性补全〕}}存储选型 \textbf{JSONL 而非 Redis}(教程准则四:只要恢复$\to$追加日志够用,要检索才上库)。过期:cleanup\_old\_sessions(ttl\_days=30) 按 mtime TTL 清理。并发冲突两处:多会话同 workdir 写 MEMORY.md $\to$ 行级原子追加+tmp+rename;多子代理共享上下文压缩 $\to$ 物理隔离(独立 transcript)。\tagref{kimi: AppendLogStore cutover · Hermes: SQLite 压缩锁 TTL 300s}
+
+\textbf{Q3 长期记忆用向量库吗?检索越来越不准怎么办?} \textcolor{acc}{\textbf{〔针对性补全〕}}\textbf{不用向量库} --- 记忆是 8000 字符硬上限的平文件(容量即精度:上限强制淘汰旧条目,检索域永远小到关键词足够准)。补了 memory\_search 只读工具。防线在写入侧:provenance 溯源+注入安检,毒条目不进检索域。记忆条目破千、跨项目复用时才上向量库;Hermes 用 FTS5(CJK trigram)也是先 BM25 后向量。\tagref{Hermes: FTS5+trigram}
+
+\textbf{Q4 上下文溢出兜底?} \textcolor{acc}{\textbf{〔针对性补全〕}}三层:① 预防 --- preflight 超 85\% 即压缩;② \textbf{自愈(本轮新增)} --- provider 报 context/overflow/length 错误时 \_chat() 捕获,force=True 强制压缩后重试,连续 3 次放弃;③ 兜死 --- 摘要失败 fail-open 保原会话。单测 TestOverflowHeal ×2。\tagref{kimi: 认领 413,窗口 ×0.85}
+
+\textbf{Q5 单用户日均 token 成本?百万级怎么控制?} \textcolor{acc}{\textbf{〔针对性补全〕}}加了\textbf{用量账本}(prompt/completion/calls 累加,turn 结束落 transcript)。现场实测:轻任务 = \textbf{5,838 prompt + 189 completion / 4 次调用};完整项目任务(T1)约 14 次工具调用、$\sim$10 次 LLM 调用。三板斧:① 缓存宪法(前缀只追加,命中缓存约 1/10 价);② 结果治理(50K 落盘只回 2K);③ 预算硬墙。\tagref{kimi: 分段缓存 · Hermes: 4 断点+冻结快照}
+
+\textbf{Q6 恶意刷长文本怎么限制?} \textcolor{acc}{\textbf{〔针对性补全〕}}三层:入口 AGENT815\_MAX\_INPUT\_CHARS(默认 20 万)超限直接拒,\textbf{零 LLM 消耗}(单测 FakeLLM 零调用);工具侧 bash 120s/30K 截断/50K 落盘;循环侧 max\_steps 硬墙+stop 闩锁。
+
+\textbf{Q7 为什么基座不微调?拿什么数据判断?} \textcolor{okc}{\textbf{〔设计决策〕}}行为约束都在工程层(system prompt 纪律+工具协议+权限链),不需要权重级定制。判断数据:工具调用成功率(73 次 0 协议错误)、任务完成率(8/8 exit 0)、失败自愈率(T1/T3)、单任务成本(Q5 账本)。微调唯一值回票价的是把 BASE\_PROMPT 烧进权重省 token --- 但损失迭代速度,不划算。
+
+\textbf{Q8 讲一个线上故障排查。} \textcolor{okc}{\textbf{〔真实案例〕}}\textbf{单 user 会话压缩失效}:小窗口压力测试(MAX\_CONTEXT=1500)下压缩恒 0。逐步重放 transcript 计算各时点估算,确认第 3 条消息起已超阈值却不触发 $\to$ 定位到``最后一条 user 必须在 tail''守护把 cut 强制拉回 1,middle 恒空。修复:守护仅 last\_user\_idx $\geq$ 2 生效。效果:压缩触发 \textbf{0 $\to$ 2 次};回归测试防复发。教训:守护规则必须考虑``被保护对象已在保护区''的边界。
+
+\subsection{二面 · 系统设计题}
+\textbf{Q9 模块怎么拆分?通信?} \textcolor{okc}{\textbf{〔已有机制〕}}12 个模块按``窄腰核心+边上插拔''拆:loop 是唯一有状态核心,三个窄接口通信 --- 工具协议(schema+handler 字典)、事件表(hooks 5 事件)、消息列表(唯一共享状态,只追加)。不走消息总线是为了缓存宪法:总线式动态注入会打碎前缀缓存。
+
+\textbf{Q10 简单任务 vs 多步拆解怎么判断?} \textcolor{okc}{\textbf{〔已有机制〕}}走 kimi 路线:\textbf{拆解权交给模型,工程层只设边界} --- max\_steps 硬墙(60)、子代理独立预算(30)、delegate\_task 让模型把探索性子任务显式派生(会污染主线上下文的活就派生,探索日志只回蒸馏报告)。Hermes 路线是预算 refund。两种都验证了``不要在工程层替模型做拆解判断''。
+
+\textbf{Q11 执行一半失败:重试/回滚/重新规划?} \textcolor{okc}{\textbf{〔已有机制〕}}分四层,触发条件显式:
+
+{\small
+\begin{longtable}{|L{0.17\textwidth}|L{0.45\textwidth}|L{0.28\textwidth}|}
+\hline
+\rowcolor{headc}\textbf{失败类型} & \textbf{策略} & \textbf{触发条件}\\\hline\endhead
+工具执行失败 & 错误文本回填,模型自行重试或换路(T1 实测) & 任何 tool exception\\\hline
+429/5xx/超时 & 指数退避($\times$2 上限 30s+20\% 抖动),最多 5 次 & HTTP 状态码/连接异常\\\hline
+上下文溢出 & 强制压缩后重试,连续 3 次放弃 & 错误含 context/overflow/length\\\hline
+权限拒绝/hook 阻断 & \textbf{不重试不绕过},原因回填换方案(T4b 实测) & sandbox/hook veto\\\hline
+\end{longtable}}
+回滚在最小设计里刻意没有(文件操作无事务),对应 kimi 的 undo/wire Op 重放 --- 痛了再加。
+
+\textbf{Q12 多工具联动?权限管控?防越权?} \textcolor{okc}{\textbf{〔已有机制〕}}联动:纯字典注册表,顺序由模型按 schema 编排;结果治理保证单工具不灌爆窗口。权限五道防线:① hardline 硬线(rm -rf /、fork bomb、写 authorized\_keys,\textbf{yolo 也不放行});② 去混淆防绕过;③ 未知工具 fail-closed;④ 三分级+ask/auto/yolo;⑤ workdir 围栏+环境剥离。价值观:\textbf{危险检测先于用户授权}。\tagref{Hermes: hardline 先于 yolo bypass}
+
+\subsection{三面 · 认知题}
+\textbf{Q13 Agent 长期风口还是短期热点?} 长期。模型每代跃迁,但两个工业 codebase 的厚度证明\textbf{工程表现的上下限由 Harness 决定} --- 同一模型接不同 Harness,安全性/成本/长任务存活率差一个数量级。落地方向:有人值守编程 CLI(kimi 型)先跑通,无人值守多表面平台(Hermes 型)跟随,自学习双闭环是下半场。
+
+\textbf{Q14 核心竞争力?} 能从``事故''反推架构:每个模块都能回答``防什么事故、对应演化阶梯第几级、kimi/Hermes 怎么解''。demo 开发者堆框架,工程师管爆炸半径、管成本、管最坏情况下限。
+
+\textbf{Q15 1--2 年最大瓶颈?ToB 还是 ToC?} 工程能力。模型已``够用''(qwen3.7-max 零协议错误完成 8 个完整项目),卡脖子的是长会话成本、无人值守安全、状态可恢复。ToB 先跑通 --- 容错预算高、边界清晰、权限可预声明;ToC 越权风险面不可控。
+
+\textbf{Q16 从 0--1 带 Agent 业务线,第一步?} 先定形态再写代码:有人值守还是无人值守?这决定主循环形状(插件链 vs 预算硬墙)、安全厚度(规则链 vs 纵深栈)、存储选型(JSONL vs SQLite+FTS5)。招人按模块招,评审标准就是``每份复杂性答得出防什么事故''。
+
+\vspace{6pt}
+{\footnotesize\color{dimc}\rule{\textwidth}{0.4pt}\\
+本报告由 report/ 六个子页面整理(XeLaTeX 重排)。HTML 版:815agent\_report\_full.html(亮/深双主题);工程问答独立 PDF:815agent\_interview.pdf。}
+
+\end{document}

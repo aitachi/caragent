@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>如何运行 — 815agent</title>
+<style>
+:root{--bg:#0f1419;--panel:#1a222b;--line:#2b3744;--fg:#d7e0e8;--dim:#8b9aab;--acc:#4fb3ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 "Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:26px;margin:0 0 4px;color:#1a2430}h2{font-size:20px;color:var(--acc);border-left:4px solid var(--acc);padding-left:10px;margin-top:38px}
+.sub{color:var(--dim);margin-bottom:24px}
+nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 26px}
+nav.tabs a{color:var(--fg);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font-size:14px}
+nav.tabs a:hover{border-color:var(--acc);color:var(--acc)}
+nav.tabs a.here{background:var(--acc);color:#fff;font-weight:700;border-color:var(--acc)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--thbg,#22303d);color:var(--thfg,#fff)}
+code{background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px;color:var(--codefg,#0b62a2)}
+pre{background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;color:var(--pre fg,#1f2a37);line-height:1.6}
+html.dark{--bg:#0f1419;--panel:#1a222b;--line:#2b3744;--fg:#d7e0e8;--dim:#8b9aab;--acc:#4fb3ff;--ok:#3fd68f;--warn:#ffb454;--bad:#ff6b6b}
+html.dark h1,html.dark h3{color:#fff}
+html.dark{--codebg:#0a0e12;--codefg:#9fd3ff;--prefg:#c9d6e2;--thbg:#22303d;--thfg:#fff}
+:root{--codebg:#eef2f6;--codefg:#0b62a2;--prefg:#1f2a37;--thbg:#dbe5ef;--thfg:#1f2a37}
+</style>
+</head>
+<body>
+<button id="themeToggle" style="position:fixed;top:14px;right:16px;z-index:99;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer" onclick="var d=document.documentElement.classList.toggle('dark');localStorage.setItem('theme815',d?'dark':'light');this.textContent=d?'🌙 深色':'☀ 亮色'">☀ 亮色</button>
+<script>if(localStorage.getItem('theme815')==='dark'){document.documentElement.classList.add('dark');document.getElementById('themeToggle').textContent='🌙 深色'}</script><div class="wrap">
+<h1>如何运行</h1>
+<div class="sub">本机 Python / Docker / ACP 宿主三种形态；API key 只走环境变量，绝不进代码与镜像。</div>
+<nav class="tabs">
+<a href="Agent模块化设计教程_v2.pdf" style="border-color:#ff6b6b;color:#ff6b6b">教程 PDF(v2)</a>
+<a href="index.html">概览</a>
+<a href="modules.html">模块设计</a>
+<a href="run.html" class="here">如何运行</a>
+<a href="compare.html">对比报告</a>
+<a href="problems.html">问题与解决</a>
+<a href="interview.html">工程问答</a>
+<a href="815agent_report_full.html">合并完整版</a>
+</nav>
+
+<h2>1. 安装</h2>
+<pre>cd 815agent
+pip install -r requirements.txt   # 只有 requests</pre>
+
+<h2>2. 配置（环境变量）</h2>
+<table>
+<tr><th>变量</th><th>说明</th><th>默认</th></tr>
+<tr><td><code>AGENT815_API_KEY</code></td><td>LLM API key（必填，运行时注入）</td><td>—</td></tr>
+<tr><td><code>AGENT815_BASE_URL</code></td><td>OpenAI 兼容接口</td><td>https://dashscope.aliyuncs.com/compatible-mode/v1</td></tr>
+<tr><td><code>AGENT815_MODEL</code></td><td>模型名</td><td>qwen3.7-max</td></tr>
+<tr><td><code>AGENT815_WORKDIR</code></td><td>沙盒围栏根目录</td><td>当前目录</td></tr>
+<tr><td><code>AGENT815_PERMISSION</code></td><td>ask / auto / yolo</td><td>auto</td></tr>
+<tr><td><code>AGENT815_MAX_CONTEXT</code></td><td>上下文窗口 tokens（压缩阈值=85%）</td><td>300000</td></tr>
+<tr><td><code>AGENT815_MAX_STEPS</code></td><td>每 turn 步数预算</td><td>60</td></tr>
+<tr><td><code>AGENT815_SUBAGENT_MAX_STEPS</code></td><td>子代理独立步数预算</td><td>30</td></tr>
+</table>
+
+<h2>3. 本机运行</h2>
+<pre># 交互模式（/exit 退出，/memory 看记忆，/compact 手动压缩）
+python -m agent815 --workdir /path/to/project
+
+# 一次性任务
+python -m agent815 --workdir ./proj --permission auto \
+  --task "创建 utils.py 并写好 unittest，跑通为止"
+
+# 恢复会话（重放 transcript 继续）
+python -m agent815 --workdir ./proj --resume ./proj/.agent815/sessions/&lt;ts&gt;.jsonl \
+  --task "继续：把刚才的测试再补两个边界用例"</pre>
+
+<h2>4. Docker（dev-server 已验证）</h2>
+<pre>docker build -t 815agent:latest .
+docker run --rm -v /tmp/ws:/workspace \
+  -e AGENT815_API_KEY=$KEY -e AGENT815_MODEL=qwen3.7-max \
+  -e AGENT815_PERMISSION=auto \
+  815agent:latest --task "写一个记账 CLI 并跑通 unittest"
+
+# 容器内跑离线测试
+docker run --rm --entrypoint python 815agent:latest -m unittest discover -s /app/tests</pre>
+
+<h2>5. ACP 宿主模式</h2>
+<pre>python -m agent815 --acp
+# 每行一个 JSON-RPC 帧（stdout 只走协议，日志全在 stderr）：
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"workdir":"/path"}}
+{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"...","text":"任务..."}}</pre>
+
+<h2>6. 扩展点</h2>
+<table>
+<tr><th>扩展</th><th>位置</th><th>说明</th></tr>
+<tr><td>自定义技能</td><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td>frontmatter 写 name/description，正文即操作手册；索引自动进 system prompt</td></tr>
+<tr><td>进程外 hook</td><td><code>.agent815/hooks.d/&lt;event&gt;_*.py</code></td><td>stdin 收 JSON payload；stdout 打印 {"decision":"block","reason":"..."} 即阻断</td></tr>
+<tr><td>新工具</td><td><code>tools.py</code></td><td>@tool 装饰器注册；记得在 sandbox.KNOWN_TOOLS 登记只读属性</td></tr>
+</table>
+
+<h2>7. 测试</h2>
+<pre>python tests/test_all.py    # 35 个离线测试（FakeLLM，不触网）</pre>
+</div></body></html>

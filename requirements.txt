@@ -1,0 +1,3 @@
+# miniagent 依赖 —— 唯一第三方依赖只有 requests（与 Dockerfile 一致）
+# Python 3.10+
+requests>=2.28

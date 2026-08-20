@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>问题与解决 — 815agent</title>
+<style>
+:root{--bg:#f6f8fa;--panel:#ffffff;--line:#d8e0e8;--fg:#1f2a37;--dim:#5a6672;--acc:#0b62a2;--ok:#1b7f4b;--warn:#b25e09;--bad:#c0392b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 "Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:26px;margin:0 0 4px;color:#1a2430}h2{font-size:20px;color:var(--acc);border-left:4px solid var(--acc);padding-left:10px;margin-top:38px}
+h3{font-size:16.5px;color:#1a2430;margin:22px 0 8px}
+.sub{color:var(--dim);margin-bottom:24px}
+nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 26px}
+nav.tabs a{color:var(--fg);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font-size:14px}
+nav.tabs a:hover{border-color:var(--acc);color:var(--acc)}
+nav.tabs a.here{background:var(--acc);color:#fff;font-weight:700;border-color:var(--acc)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 22px;margin:14px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--thbg,#22303d);color:var(--thfg,#fff)}
+code{background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px;color:var(--codefg,#0b62a2)}
+pre{background:var(--codebg,#eef2f6);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;color:var(--pre fg,#1f2a37);line-height:1.6}
+.verdict{font-size:17px;font-weight:700;padding:12px 18px;border-radius:8px;margin:12px 0}
+.verdict.no{background:rgba(61,214,143,.1);border:1px solid var(--ok);color:var(--ok)}
+.verdict.risk{background:rgba(255,180,84,.1);border:1px solid var(--warn);color:var(--warn)}
+.fix{color:var(--ok)}.bug{color:var(--bad)}
+html.dark{--bg:#0f1419;--panel:#1a222b;--line:#2b3744;--fg:#d7e0e8;--dim:#8b9aab;--acc:#4fb3ff;--ok:#3fd68f;--warn:#ffb454;--bad:#ff6b6b}
+html.dark h1,html.dark h3{color:#fff}
+html.dark{--codebg:#0a0e12;--codefg:#9fd3ff;--prefg:#c9d6e2;--thbg:#22303d;--thfg:#fff}
+:root{--codebg:#eef2f6;--codefg:#0b62a2;--prefg:#1f2a37;--thbg:#dbe5ef;--thfg:#1f2a37}
+</style>
+</head>
+<body>
+<button id="themeToggle" style="position:fixed;top:14px;right:16px;z-index:99;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer" onclick="var d=document.documentElement.classList.toggle('dark');localStorage.setItem('theme815',d?'dark':'light');this.textContent=d?'🌙 深色':'☀ 亮色'">☀ 亮色</button>
+<script>if(localStorage.getItem('theme815')==='dark'){document.documentElement.classList.add('dark');document.getElementById('themeToggle').textContent='🌙 深色'}</script><div class="wrap">
+<h1>问题与解决</h1>
+<div class="sub">两类污染的系统分析（参照 kimi-code 解法）+ 实测发现的全部问题与修复清单</div>
+<nav class="tabs">
+<a href="Agent模块化设计教程_v2.pdf" style="border-color:#ff6b6b;color:#ff6b6b">教程 PDF(v2)</a>
+<a href="index.html">概览</a>
+<a href="modules.html">模块设计</a>
+<a href="run.html">如何运行</a>
+<a href="compare.html">对比报告</a>
+<a href="problems.html" class="here">问题与解决</a>
+<a href="interview.html">工程问答</a>
+<a href="815agent_report_full.html">合并完整版</a>
+</nav>
+
+<h2>问题一：多子代理上下文压缩污染</h2>
+<div class="verdict no">结论：815agent 不存在该污染 —— 加固前因为没有子代理；新增 delegate_task 后因为"物理隔离"设计。</div>
+<h3>这类污染是什么</h3>
+<div class="card">教程记载的原型事故是 <strong>Hermes #38727</strong>：父 agent 与后台 fork <strong>共享同一个 session</strong>，两边同时触发压缩 → 各自写出一套压缩后历史 → 双 sibling 会话分叉。推而广之，凡"多执行体共享可变上下文/共享持久化"的子代理设计，都会踩三个坑：
+<ul>
+<li>父压缩把子代理的 tool_call/result 对从中间切开，协议直接 400；</li>
+<li>两个执行体对同一历史各自压缩，账本分叉（谁的中段都不是对方的）；</li>
+<li>子代理的探索日志全量回灌主线窗口，主线压缩被迫提前且摘要被探索噪声稀释。</li></ul></div>
+<h3>kimi-code 的解法（参照来源）</h3>
+<div class="card">
+<ul>
+<li><strong>扁平子代理 = 普通 Agent Scope</strong>：显式注释"无父子嵌套"，每个 agent 有自己的 <code>wire.jsonl</code> —— 压缩是各自 wire 内的一个 Op，单一一致性边界，天然不互相碰；</li>
+<li><strong>只回传 distillSummary</strong>：子代理探索过程不进主线，回传的摘要有 minChars/重试纪律；</li>
+<li><strong>historySafeToCompact</strong>：压缩应用前做前缀逐引用相等校验，发现历史被并发篡改就放弃应用；</li>
+<li><strong>swarm 限速</strong>：突发 5 + 700ms/个，防并行派生触发 provider 限速雪崩。</li></ul></div>
+<h3>815agent 的落地（subagent.py，47 行）</h3>
+<pre>delegate_task(task)
+  ├─ 全新 Agent 实例：独立 messages（物理隔离 → 父压缩永远碰不到子上下文）
+  ├─ 独立 transcript 文件（kimi 的"每 agent 一个 wire.jsonl"等价物）
+  ├─ 独立预算 AGENT815_SUBAGENT_MAX_STEPS=30（不侵蚀父步数）
+  ├─ 独立 stop 闩锁
+  ├─ system prompt 与父同前缀（暖缓存，kimi fork 继承 _cached_system_prompt 同思路）
+  └─ 只回传最终文本（distill，10K 截断）——探索日志不灌主线</pre>
+<div class="card"><span class="fix">✓ 验证</span>：T7 现场任务中父代理 transcript 仅含 <code>delegate_task → write_file → bash×2</code>；子代理的 11 次探索调用（list_dir/read_file/glob）完整记录在自己独立的 transcript 文件里，主线窗口零污染。单测 <code>TestSubagent</code> ×3 覆盖隔离/预算/蒸馏截断。</div>
+
+<h2>问题二：多会话记忆（memory）压缩污染</h2>
+<div class="verdict risk">结论：加固前存在两类真实风险（并发写竞态、带毒注入），一类天然免疫（摘要劫持）；已全部修复并测试。</div>
+<h3>形态 A：压缩把记忆卷进摘要 → 摘要劫持 <span class="fix">（设计天然免疫）</span></h3>
+<div class="card">记忆快照位于 <code>messages[0]</code>（system），压缩的 head 保护（<code>messages[:2]</code>）保证它<strong>永不进入被摘要的中段</strong>；摘要输出又带 <code>[REFERENCE ONLY] + 最新用户消息优先</code> 免疫包裹。两条防线叠加，Hermes #11475/#35344 类事故在 815agent 结构上不成立。</div>
+<h3>形态 B：并发会话写 MEMORY.md → 截断竞态 <span class="fix">（已修复）</span></h3>
+<div class="card"><span class="bug">原风险</span>：两个会话同 workdir 同时超限截断 → 读-改-写竞态，丢教训甚至写出半文件；教训无时间戳，无法溯源是谁写的。<br>
+<span class="fix">修复</span>：① 追加写带 UTC provenance（<code>- [2026-08-15T07:30:12Z] ...</code>），保持行级原子；② 截断重写改 <strong>tmp+rename 原子替换</strong>（kimi AppendLogStore 的 cutover 思路最小化）。</div>
+<h3>形态 C：被污染条目随快照带毒注入 <span class="fix">（已修复）</span></h3>
+<div class="card"><span class="bug">原风险</span>：某会话被提示注入后调 <code>save_lesson</code> 写入"忽略之前所有指令…"之类的毒条目 → 之后<strong>每个新会话</strong>都随冻结快照自动注入（自学习路线的固定税，Hermes #11475 系）。<br>
+<span class="fix">修复</span>：快照加载时逐行<strong>注入安检</strong>（指令覆盖/角色冒充/系统标签/压缩围栏回显等模式），命中条目替换为占位符 <code>[已过滤：疑似注入内容的记忆条目]</code> —— Hermes threat_patterns 扫描的最小对应物。<br>
+<span class="fix">验证</span>：单测 <code>test_injection_scan_on_load</code> 确认毒条目被过滤、正常条目不受影响。</div>
+<h3>为什么不干脆学 kimi 不要记忆？</h3>
+<div class="card">kimi-code 的答案是"会话即记忆 + 用户声明规则"，把跨会话学习整体外包——零污染面，但也零自学习。815agent 保留轻量自产记忆（agent 现场两次主动 save_lesson 都写出了有价值的教训），代价是必须支付上述 B/C 两项防御——这是教程第 5 章"自学习固定税"的最小缴纳方式。</div>
+
+<h2>实测发现的全部问题与修复（时间序）</h2>
+<table>
+<tr><th>#</th><th>问题</th><th>根因</th><th>修复</th><th>验证</th></tr>
+<tr><td>1</td><td>一次性任务结束打印崩溃</td><td>Windows 控制台 GBK，模型输出含 ✅ 等字符</td><td>cli.py 启动即 reconfigure stdout/stderr 为 utf-8/replace</td><td>冒烟 exit 0</td></tr>
+<tr><td>2</td><td>进程外 hook 读 payload 失败</td><td>子进程 sys.stdin 默认 GBK</td><td>示例 hook 改 buffer+utf-8；父进程注入 PYTHONIOENCODING=utf-8</td><td>T4b 阻断适配实测</td></tr>
+<tr><td>3</td><td><strong>单 user 会话永不压缩</strong></td><td>"最后 user 必须在 tail"守护把 cut 拉回 1 → middle 恒空</td><td>守护仅在 last_user_idx ≥ 2 时生效 + 回归测试</td><td>t6d 现场压缩触发 2 次</td></tr>
+<tr><td>4</td><td>记忆并发写竞态 / 带毒注入</td><td>见形态 B/C</td><td>provenance + tmp+rename + 注入安检</td><td>TestMemory ×3</td></tr>
+<tr><td>5</td><td>无子代理机制（能力缺口）</td><td>最小设计留白</td><td>delegate_task 物理隔离派生</td><td>TestSubagent ×3 + T7 现场</td></tr>
+</table>
+
+<h2>已知边界（有意不修，对应教程演化阶梯）</h2>
+<table>
+<tr><th>边界</th><th>对应演化级</th><th>什么时候该加</th></tr>
+<tr><td>极小窗口下压缩 thrash（压完又超阈）</td><td>Ch.2 第 6 级反抖动三件套</td><td>真实长会话逼近 30 万窗口时</td></tr>
+<tr><td>LLM 非流式（整段等待）</td><td>Ch.1 第 1 级流式解析</td><td>交互体验成为瓶颈时</td></tr>
+<tr><td>无并发子代理调度（swarm）</td><td>Ch.9 第 5 级批调度限速</td><td>并行探索需求出现时</td></tr>
+<tr><td>无 MCP 外部工具桥接</td><td>Ch.3 第 8 级</td><td>需要接外部生态时</td></tr>
+<tr><td>无 LLM 兜底裁决（Smart Approval）</td><td>Ch.4 第 10 级</td><td>无人值守部署时</td></tr>
+</table>
+</div></body></html>
